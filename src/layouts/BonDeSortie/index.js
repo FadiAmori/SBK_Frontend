@@ -278,7 +278,10 @@ const BonDeSortieComponent = () => {
       try {
         let response;
         if (isEditing) {
-          response = await axios.put(`https://sbk-1.onrender.com/api/bons-de-sortie/${_id}`, payload);
+          response = await axios.put(
+            `https://sbk-1.onrender.com/api/bons-de-sortie/${_id}`,
+            payload
+          );
         } else {
           response = await axios.post("https://sbk-1.onrender.com/api/bons-de-sortie", payload);
         }
