@@ -1,6 +1,6 @@
 /**
 =========================================================
-* Material Dashboard 2 React - v2.2.0
+*  React - v2.2.0
 =========================================================
 
 * Product Page: https://www.creative-tim.com/product/material-dashboard-react
@@ -20,16 +20,15 @@ export default function sidenavLogoLabel(theme, ownerState) {
   const { fontWeightMedium } = typography;
 
   return {
-    ml: 0.5,
     fontWeight: fontWeightMedium,
-    wordSpacing: pxToRem(-1),
+    fontSize: pxToRem(16),
     transition: transitions.create("opacity", {
       easing: transitions.easing.easeInOut,
       duration: transitions.duration.standard,
     }),
-
+    opacity: miniSidenav ? 0 : 1,
     [breakpoints.up("xl")]: {
-      opacity: miniSidenav ? 0 : 1,
+      opacity: 1,
     },
   };
 }

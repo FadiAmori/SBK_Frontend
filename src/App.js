@@ -18,6 +18,9 @@ import { useState, useEffect, useMemo } from "react";
 // react-router components
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
+// prop-types is a library for typechecking of props.
+import PropTypes from "prop-types";
+
 // @mui material components
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -52,6 +55,34 @@ import { useMaterialUIController, setMiniSidenav, setOpenConfigurator } from "co
 // Images
 import brandWhite from "assets/images/logo-ct.png";
 import brandDark from "assets/images/logo-ct-dark.png";
+
+// Authentication component
+import Basic from "layouts/authentication/sign-in";
+
+// Protected Route component
+const ProtectedRoute = ({ children }) => {
+  const isAuthenticated =
+    localStorage.getItem("isAuthenticated") === "true" ||
+    sessionStorage.getItem("isAuthenticated") === "true";
+  return isAuthenticated ? children : <Navigate to="/authentication/sign-in" />;
+};
+
+// Public Route component for login page
+const PublicRoute = ({ children }) => {
+  const isAuthenticated =
+    localStorage.getItem("isAuthenticated") === "true" ||
+    sessionStorage.getItem("isAuthenticated") === "true";
+  return isAuthenticated ? <Navigate to="/dashboard" /> : children;
+};
+
+// Typechecking props for the ProtectedRoute and PublicRoute
+ProtectedRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+};
+
+PublicRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+};
 
 export default function App() {
   const [controller, dispatch] = useMaterialUIController();
@@ -116,7 +147,14 @@ export default function App() {
       }
 
       if (route.route) {
-        return <Route exact path={route.route} element={route.component} key={route.key} />;
+        return (
+          <Route
+            exact
+            path={route.route}
+            element={<ProtectedRoute>{route.component}</ProtectedRoute>}
+            key={route.key}
+          />
+        );
       }
 
       return null;
@@ -166,8 +204,16 @@ export default function App() {
         )}
         {layout === "vr" && <Configurator />}
         <Routes>
+          <Route
+            path="/authentication/sign-in"
+            element={
+              <PublicRoute>
+                <Basic />
+              </PublicRoute>
+            }
+          />
           {getRoutes(routes)}
-          <Route path="*" element={<Navigate to="/dashboard" />} />
+          <Route path="*" element={<Navigate to="/authentication/sign-in" />} />
         </Routes>
       </ThemeProvider>
     </CacheProvider>
@@ -179,7 +225,7 @@ export default function App() {
           <Sidenav
             color={sidenavColor}
             brand={(transparentSidenav && !darkMode) || whiteSidenav ? brandDark : brandWhite}
-            brandName="Material Dashboard 2"
+            brandName="Ben Mahmoud khmaies"
             routes={routes}
             onMouseEnter={handleOnMouseEnter}
             onMouseLeave={handleOnMouseLeave}
@@ -190,8 +236,16 @@ export default function App() {
       )}
       {layout === "vr" && <Configurator />}
       <Routes>
+        <Route
+          path="/authentication/sign-in"
+          element={
+            <PublicRoute>
+              <Basic />
+            </PublicRoute>
+          }
+        />
         {getRoutes(routes)}
-        <Route path="*" element={<Navigate to="/dashboard" />} />
+        <Route path="*" element={<Navigate to="/authentication/sign-in" />} />
       </Routes>
     </ThemeProvider>
   );
