@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -59,7 +60,7 @@ const BonDeSortieComponent = () => {
   const fetchBonsDeSortie = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/bons-de-sortie");
+      const res = await axios.get(`${API_BASE_URL}/api/bons-de-sortie`);
       const data = Array.isArray(res.data) ? res.data : [res.data];
       setBonsDeSortie(data);
     } catch (err) {
@@ -71,7 +72,7 @@ const BonDeSortieComponent = () => {
 
   const fetchProduits = async () => {
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/produits");
+      const res = await axios.get(`${API_BASE_URL}/api/produits`);
       const data = Array.isArray(res.data) ? res.data : [res.data];
       console.log("Fetched produits:", data);
       const validProduits = data.filter(
@@ -125,6 +126,20 @@ const BonDeSortieComponent = () => {
     setError(""); // Clear error when modifying items
   };
 
+  const handleQuantityChange = (index, newQuantity) => {
+    if (newQuantity < 1) return;
+    const item = bonItems[index];
+    const produit = produits.find((p) => p._id === item.produit);
+    if (produit && produit.stockActuel < newQuantity) {
+      setError(
+        `Stock insuffisant pour ${produit.nomProduit}: ${produit.stockActuel} disponible, ${newQuantity} requis`
+      );
+      return;
+    }
+    setBonItems(bonItems.map((it, idx) => (idx === index ? { ...it, quantite: newQuantity } : it)));
+    setError("");
+  };
+
   const calculateStock = () => {
     const stockChanges = bonItems.reduce(
       (acc, item) => {
@@ -167,7 +182,7 @@ const BonDeSortieComponent = () => {
   const handleEditBon = async (bon) => {
     setIsEditing(true);
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/bons-de-sortie/${bon._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/bons-de-sortie/${bon._id}`);
       console.log("Edit bon response:", res.data);
       setCurrentBon({
         ...res.data,
@@ -195,7 +210,7 @@ const BonDeSortieComponent = () => {
 
   const handleViewBon = async (bon) => {
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/bons-de-sortie/${bon._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/bons-de-sortie/${bon._id}`);
       console.log("View bon response:", res.data);
       setCurrentBon({
         ...res.data,
@@ -224,7 +239,7 @@ const BonDeSortieComponent = () => {
   const handleDeleteBon = async (id) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce bon de sortie ?")) {
       try {
-        await axios.delete(`https://sbk-1.onrender.com/api/bons-de-sortie/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/bons-de-sortie/${id}`);
         setBonsDeSortie((prev) => prev.filter((bon) => bon._id !== id));
         setError("");
       } catch (err) {
@@ -278,16 +293,13 @@ const BonDeSortieComponent = () => {
       try {
         let response;
         if (isEditing) {
-          response = await axios.put(
-            `https://sbk-1.onrender.com/api/bons-de-sortie/${_id}`,
-            payload
-          );
+          response = await axios.put(`${API_BASE_URL}/api/bons-de-sortie/${_id}`, payload);
         } else {
-          response = await axios.post("https://sbk-1.onrender.com/api/bons-de-sortie", payload);
+          response = await axios.post(`${API_BASE_URL}/api/bons-de-sortie`, payload);
         }
         console.log("Create/Update response:", response.data);
         const populatedBon = await axios.get(
-          `https://sbk-1.onrender.com/api/bons-de-sortie/${response.data._id}`
+          `${API_BASE_URL}/api/bons-de-sortie/${response.data._id}`
         );
         console.log("Populated bon:", populatedBon.data);
         generatePDF(populatedBon.data);
@@ -537,7 +549,17 @@ const BonDeSortieComponent = () => {
 
   const itemTableRows = bonItems.map((item, index) => ({
     nomProduit: item.nomProduit || "Inconnu",
-    quantite: item.quantite || 0,
+    quantite: (
+      <TextField
+        type="number"
+        value={item.quantite}
+        onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
+        variant="outlined"
+        size="small"
+        sx={{ width: "80px" }}
+        inputProps={{ min: 1 }}
+      />
+    ),
     actions: (
       <MDBox display="flex" justifyContent="center" alignItems="center" gap={1}>
         <IconButton color="error" onClick={() => handleDeleteItem(index)} aria-label="Supprimer">
@@ -630,7 +652,7 @@ const BonDeSortieComponent = () => {
                       variant="outlined"
                     >
                       <MenuItem value="">Tous</MenuItem>
-                      {["Vente", "Don", "Transfert", "Usage interne"].map((motif) => (
+                      {["Vente", "Don", "Livraison", "Usage interne"].map((motif) => (
                         <MenuItem key={motif} value={motif}>
                           {motif}
                         </MenuItem>
@@ -722,7 +744,7 @@ const BonDeSortieComponent = () => {
                   <MenuItem value="" disabled>
                     Sélectionner un motif
                   </MenuItem>
-                  {["Vente", "Don", "Transfert", "Usage interne"].map((motif) => (
+                  {["Vente", "Don", "Livraison", "Usage interne"].map((motif) => (
                     <MenuItem key={motif} value={motif}>
                       {motif}
                     </MenuItem>

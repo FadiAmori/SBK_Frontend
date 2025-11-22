@@ -14,6 +14,8 @@ Coded by www.creative-tim.com
 */
 
 import { useState } from "react";
+import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 import { useNavigate } from "react-router-dom";
 
 // react-router-dom components
@@ -65,7 +67,22 @@ function Basic() {
         sessionStorage.setItem("isAuthenticated", "true");
       }
       setError("");
-      navigate("/dashboard"); // Redirect to dashboard after login
+      // Fetch low-stock notifications and alert user with the list
+      (async () => {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/api/produits`);
+          const data = Array.isArray(res.data) ? res.data : [res.data];
+          const lowStock = data.filter((p) => (p.stockActuel || 0) <= (p.stockMinimal || 0));
+          if (lowStock.length > 0) {
+            const names = lowStock.map((p) => p.nomProduit || p.referenceProduit).join(", ");
+            alert(`Notifications (stock faible): ${names}`);
+          }
+        } catch (err) {
+          // ignore
+        } finally {
+          navigate("/dashboard");
+        }
+      })();
     } else {
       setError("Invalid email or password");
     }

@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -65,10 +66,19 @@ const NotificationComponent = () => {
     fetchFournisseurs();
   }, []);
 
+  // Helper to resolve fournisseur name from either an id string or a populated object
+  const resolveFournisseurName = (fournisseurPrincipal) => {
+    if (!fournisseurPrincipal) return "N/A";
+    const id =
+      typeof fournisseurPrincipal === "object" ? fournisseurPrincipal._id : fournisseurPrincipal;
+    const found = fournisseurs.find((f) => String(f._id) === String(id));
+    return found?.nomRaisonSociale || "N/A";
+  };
+
   const fetchProduits = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/produits`);
+      const res = await axios.get(`${API_BASE_URL}/api/produits`);
       const data = Array.isArray(res.data) ? res.data : [res.data];
       // Filter products where stockActuel <= stockMinimal
       const lowStockProducts = data.filter(
@@ -84,7 +94,7 @@ const NotificationComponent = () => {
 
   const fetchFournisseurs = async () => {
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/fournisseurs`);
+      const res = await axios.get(`${API_BASE_URL}/api/fournisseurs`);
       setFournisseurs(Array.isArray(res.data) ? res.data : [res.data]);
     } catch (err) {
       setError(err.response?.data?.error || "Échec de la récupération des fournisseurs.");
@@ -93,7 +103,7 @@ const NotificationComponent = () => {
 
   const handleView = async (produit) => {
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/produits/${produit._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/produits/${produit._id}`);
       setCurrentProduit({
         ...res.data,
         recherche: res.data.recherche?.join(", ") || "",
@@ -220,9 +230,7 @@ const NotificationComponent = () => {
               { label: "Recherche Correspondance", value: currentProduit.rechercheCorrespondance },
               {
                 label: "Fournisseur Principal",
-                value:
-                  fournisseurs.find((f) => f._id === currentProduit.fournisseurPrincipal)
-                    ?.nomRaisonSociale || "N/A",
+                value: resolveFournisseurName(currentProduit.fournisseurPrincipal),
               },
             ].map(({ label, value }) => (
               <Grid item xs={6} key={label}>

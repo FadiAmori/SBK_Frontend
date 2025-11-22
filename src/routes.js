@@ -84,10 +84,10 @@ const routes = [
 
   {
     type: "collapse",
-    name: "Factuer de vent",
-    key: "Factuer",
+    name: "Facture de vent",
+    key: "Facture",
     icon: <Icon fontSize="small">inventory</Icon>,
-    route: "/Factuer",
+    route: "/Facture",
     component: <FactureComponent />,
   },
   {
@@ -108,10 +108,10 @@ const routes = [
   },
   {
     type: "collapse",
-    name: "Factuer de Achat",
-    key: "Factuer de Achat",
+    name: "Facture de Achat",
+    key: "Facture de Achat",
     icon: <Icon fontSize="small">inventory</Icon>,
-    route: "/FactuerdeAchat",
+    route: "/FacturedeAchat",
     component: <FactureAchatComponent />,
   },
   {

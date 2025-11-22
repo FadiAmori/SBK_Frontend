@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -73,7 +74,7 @@ const FactureAchatComponent = () => {
   const fetchFactures = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/factureAchats");
+      const res = await axios.get(`${API_BASE_URL}/api/factureAchats`);
       const data = Array.isArray(res.data) ? res.data : [res.data];
       setFactures(data);
     } catch (err) {
@@ -85,7 +86,7 @@ const FactureAchatComponent = () => {
 
   const fetchProduits = async () => {
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/produits");
+      const res = await axios.get(`${API_BASE_URL}/api/produits`);
       setProduits(Array.isArray(res.data) ? res.data : [res.data]);
     } catch (err) {
       setError(err.response?.data?.error || "Échec de la récupération des produits.");
@@ -94,7 +95,7 @@ const FactureAchatComponent = () => {
 
   const fetchFournisseurs = async () => {
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/fournisseurs");
+      const res = await axios.get(`${API_BASE_URL}/api/fournisseurs`);
       setFournisseurs(Array.isArray(res.data) ? res.data : [res.data]);
     } catch (err) {
       setError(err.response?.data?.error || "Échec de la récupération des fournisseurs.");
@@ -112,7 +113,7 @@ const FactureAchatComponent = () => {
       return;
     }
     try {
-      const response = await axios.post("https://sbk-1.onrender.com/api/produits", {
+      const response = await axios.post(`${API_BASE_URL}/api/produits`, {
         ...newProduit,
         prixUnitaireHT: parseFloat(newProduit.prixUnitaireHT),
         tvaApplicable: parseFloat(newProduit.tvaApplicable),
@@ -177,24 +178,22 @@ const FactureAchatComponent = () => {
   };
 
   const calculateTotalHT = () => {
+    // For purchase invoices use the product's purchase price (prixAchat)
     return factureItems.reduce((total, item) => {
       const produit = produits.find((p) => p._id === item.produit);
-      return total + (produit?.prixUnitaireHT || 0) * item.quantite;
+      return total + (produit?.prixAchat || 0) * item.quantite;
     }, 0);
   };
 
   const calculateTVA = () => {
-    return factureItems.reduce((total, item) => {
-      const produit = produits.find((p) => p._id === item.produit);
-      return (
-        total +
-        (produit?.prixUnitaireHT || 0) * ((produit?.tvaApplicable || 0) / 100) * item.quantite
-      );
-    }, 0);
+    // For purchase invoices we choose to not display TVA in the UI/PDF when Total TTC
+    // is defined as the sum of purchase prices. Return 0 so TVA is hidden/ignored.
+    return 0;
   };
 
   const calculateTotalTTC = () => {
-    return calculateTotalHT() + calculateTVA();
+    // Treat Total TTC as the sum of purchase prices (no TVA included)
+    return calculateTotalHT();
   };
 
   const handleInputChange = (e) => {
@@ -234,7 +233,7 @@ const FactureAchatComponent = () => {
   const handleEditFacture = async (facture) => {
     setIsEditing(true);
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/factureAchats/${facture._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/factureAchats/${facture._id}`);
       console.log("Edit facture response:", res.data);
       setCurrentFacture({
         ...res.data,
@@ -269,7 +268,7 @@ const FactureAchatComponent = () => {
 
   const handleViewFacture = async (facture) => {
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/factureAchats/${facture._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/factureAchats/${facture._id}`);
       console.log("View facture response:", res.data);
       setCurrentFacture({
         ...res.data,
@@ -304,7 +303,7 @@ const FactureAchatComponent = () => {
   const handleDeleteFacture = async (id) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer cette facture d'achat ?")) {
       try {
-        await axios.delete(`https://sbk-1.onrender.com/api/factureAchats/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/factureAchats/${id}`);
         setFactures((prev) => prev.filter((facture) => facture._id !== id));
       } catch (err) {
         setError(err.response?.data?.error || "Échec de la suppression de la facture d'achat.");
@@ -333,13 +332,7 @@ const FactureAchatComponent = () => {
 
     console.log("Submit facture payload:", payload);
 
-    if (
-      !payload.fournisseur ||
-      !payload.montantHT ||
-      !payload.tva ||
-      !payload.montantTTC ||
-      payload.liste.length === 0
-    ) {
+    if (!payload.fournisseur || !payload.montantTTC || payload.liste.length === 0) {
       setError("Veuillez remplir tous les champs obligatoires et ajouter des articles.");
       return;
     }
@@ -347,13 +340,13 @@ const FactureAchatComponent = () => {
     try {
       let response;
       if (isEditing) {
-        response = await axios.put(`https://sbk-1.onrender.com/api/factureAchats/${_id}`, payload);
+        response = await axios.put(`${API_BASE_URL}/api/factureAchats/${_id}`, payload);
       } else {
-        response = await axios.post("https://sbk-1.onrender.com/api/factureAchats", payload);
+        response = await axios.post(`${API_BASE_URL}/api/factureAchats`, payload);
       }
       console.log("Create/Update response:", response.data);
       const populatedFacture = await axios.get(
-        `https://sbk-1.onrender.com/api/factureAchats/${response.data._id}`
+        `${API_BASE_URL}/api/factureAchats/${response.data._id}`
       );
       console.log("Populated facture:", populatedFacture.data);
       generatePDF(populatedFacture.data);
@@ -407,16 +400,21 @@ const FactureAchatComponent = () => {
           typeof facture.fournisseur === "object"
             ? facture.fournisseur
             : fournisseurs.find((f) => f._id === facture.fournisseur) || {};
+        // Position supplier details in a tidy left column with clear spacing
+        // Move these up slightly and reserve extra vertical space before the table
+        const leftColY1 = logoY + logoHeight + 12;
+        const leftColY2 = logoY + logoHeight + 24;
+        const leftColY3 = logoY + logoHeight + 36;
+        doc.text(`Fournisseur: ${fournisseurData.nomRaisonSociale || "N/A"}`, margin, leftColY1);
         doc.text(
-          `Fournisseur: ${fournisseurData.nomRaisonSociale || "N/A"}`,
+          `Matricule Fiscale: ${fournisseurData.matriculeFiscale || "N/A"}`,
           margin,
-          logoY + logoHeight + 20
+          leftColY2
         );
-        doc.text(
-          `Numéro Facture: ${facture.numeroFacture || "N/A"}`,
-          margin,
-          logoY + logoHeight + 30
-        );
+        doc.text(`Numéro Facture: ${facture.numeroFacture || "N/A"}`, margin, leftColY3);
+        // Right column: align dates to the right with matching vertical spacing
+        const rightColY1 = leftColY1; // align first date with fournisseur line
+        const rightColY2 = leftColY2; // align second date with matricule line
         doc.text(
           `Date Facturation: ${
             facture.dateFacturation
@@ -424,7 +422,7 @@ const FactureAchatComponent = () => {
               : "N/A"
           }`,
           pageWidth - margin,
-          logoY + logoHeight + 20,
+          rightColY1,
           { align: "right" }
         );
         doc.text(
@@ -434,30 +432,28 @@ const FactureAchatComponent = () => {
               : "N/A"
           }`,
           pageWidth - margin,
-          logoY + logoHeight + 30,
+          rightColY2,
           { align: "right" }
         );
       };
 
       addHeader();
 
+      // Start the items table lower so header text (numero, matricule, dates) does not overlap
       autoTable(doc, {
-        startY: logoY + logoHeight + 40,
-        head: [["Quantité", "Désignation", "Prix Unitaire HT", "TVA", "Prix Total"]],
+        startY: logoY + logoHeight + 60,
+        head: [["Quantité", "Désignation", "Prix d'Achat (DT)"]],
         body: facture.liste.map((item) => {
           const produit =
             item.produit && typeof item.produit === "object"
               ? item.produit
               : produits.find((p) => p._id === (item.produit?._id || item.produit)) || {};
-          const unitPrice = produit.prixUnitaireHT || 0;
-          const tva = produit.tvaApplicable || 0;
-          const totalPrice = unitPrice * item.quantite * (1 + tva / 100);
+          // For purchase invoices we show the purchase price only
+          const unitPrice = produit.prixAchat || 0;
           return [
             item.quantite || 0,
             produit.nomProduit || "Inconnu",
             `${unitPrice.toFixed(2)} DT`,
-            `${tva.toFixed(2)}%`,
-            `${totalPrice.toFixed(2)} DT`,
           ];
         }),
         theme: "grid",
@@ -469,13 +465,10 @@ const FactureAchatComponent = () => {
 
       const itemsFinalY = doc.lastAutoTable.finalY || logoY + logoHeight + 50;
       const totalsStartY = itemsFinalY + 10;
+      // Show only the total amount (Total TTC) which for purchase invoices is the sum of purchase prices
       autoTable(doc, {
         startY: totalsStartY,
-        body: [
-          ["Montant HT", `${(facture.montantHT || 0).toFixed(2)} DT`],
-          ["TVA", `${(facture.tva || 0).toFixed(2)} DT`],
-          ["Montant TTC", `${(facture.montantTTC || 0).toFixed(2)} DT`],
-        ],
+        body: [["Montant TTC", `${(facture.montantTTC || 0).toFixed(2)} DT`]],
         theme: "grid",
         margin: { left: margin + 70, right: margin },
         styles: { fontSize: 10, cellPadding: 2, font: "helvetica" },
@@ -551,20 +544,19 @@ const FactureAchatComponent = () => {
     ),
   }));
 
+  // For purchase invoices we show only designation, quantity and purchase unit price.
+  // TVA and per-line Prix Total are not shown because Total TTC is the sum of purchase prices.
   const itemTableColumns = [
     { Header: "Désignation", accessor: "designation", align: "center" },
     { Header: "Quantité", accessor: "quantite", align: "center" },
-    { Header: "Prix Unitaire HT", accessor: "prixUnitaire", align: "center" },
-    { Header: "TVA", accessor: "tva", align: "center" },
-    { Header: "Prix Total", accessor: "prixTotal", align: "center" },
+    { Header: "Prix d'Achat (DT)", accessor: "prixUnitaire", align: "center" },
     { Header: "Actions", accessor: "actions", align: "center" },
   ];
 
   const itemTableRows = factureItems.map((item, index) => {
     const produit = produits.find((p) => p._id === item.produit);
-    const unitPrice = produit?.prixUnitaireHT || 0;
-    const tva = produit?.tvaApplicable || 0;
-    const totalPrice = unitPrice * item.quantite * (1 + tva / 100);
+    // Use purchase price for purchase invoice item listing
+    const unitPrice = produit?.prixAchat || 0;
     return {
       designation: produit?.nomProduit || "Inconnu",
       quantite: (
@@ -579,8 +571,6 @@ const FactureAchatComponent = () => {
         />
       ),
       prixUnitaire: `${unitPrice.toFixed(2)} DT`,
-      tva: `${tva.toFixed(2)}%`,
-      prixTotal: `${totalPrice.toFixed(2)} DT`,
       actions: (
         <MDBox display="flex" justifyContent="center" alignItems="center" gap={1}>
           <IconButton color="error" onClick={() => handleDeleteItem(index)} aria-label="Supprimer">
@@ -602,6 +592,8 @@ const FactureAchatComponent = () => {
     boxShadow: 24,
     p: 4,
     borderRadius: 2,
+    maxHeight: "80vh",
+    overflowY: "auto",
   };
 
   const handleClearFilters = () => {
@@ -881,7 +873,7 @@ const FactureAchatComponent = () => {
                 <Autocomplete
                   options={produits}
                   getOptionLabel={(option) =>
-                    `${option.nomProduit} (Prix: ${option.prixUnitaireHT.toFixed(2)} DT)`
+                    `${option.nomProduit} (Prix d'achat: ${(option.prixAchat || 0).toFixed(2)} DT)`
                   }
                   value={selectedProduit}
                   onChange={(event, newValue) => setSelectedProduit(newValue)}
@@ -1077,8 +1069,6 @@ const FactureAchatComponent = () => {
               },
               { label: "Mode de Paiement", value: currentFacture.modePaiement || "N/A" },
               { label: "Statut", value: currentFacture.statut || "N/A" },
-              { label: "Montant HT", value: `${(currentFacture.montantHT || 0).toFixed(2)} DT` },
-              { label: "TVA", value: `${(currentFacture.tva || 0).toFixed(2)} DT` },
               { label: "Montant TTC", value: `${(currentFacture.montantTTC || 0).toFixed(2)} DT` },
               { label: "Recherche", value: currentFacture.recherche || "N/A" },
             ].map(({ label, value }) => (

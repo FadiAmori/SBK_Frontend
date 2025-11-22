@@ -14,6 +14,8 @@ Coded by www.creative-tim.com
 */
 
 import { useState, useEffect } from "react";
+import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 
 // react-router components
 import { useLocation, Link, useNavigate } from "react-router-dom";
@@ -59,6 +61,7 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const [controller, dispatch] = useMaterialUIController();
   const { miniSidenav, transparentNavbar, fixedNavbar, openConfigurator, darkMode } = controller;
   const [openMenu, setOpenMenu] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
   const route = useLocation().pathname.split("/").slice(1);
   const navigate = useNavigate();
 
@@ -98,6 +101,20 @@ function DashboardNavbar({ absolute, light, isMini }) {
     sessionStorage.removeItem("isAuthenticated");
     navigate("/authentication/sign-in");
   };
+
+  useEffect(() => {
+    const fetchNotifCount = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/produits`);
+        const data = Array.isArray(res.data) ? res.data : [res.data];
+        const lowStock = data.filter((p) => (p.stockActuel || 0) <= (p.stockMinimal || 0));
+        setNotifCount(lowStock.length);
+      } catch (err) {
+        // ignore
+      }
+    };
+    fetchNotifCount();
+  }, []);
 
   // Styles for the navbar icons
   const iconsStyle = ({ palette: { dark, white, text }, functions: { rgba } }) => ({
@@ -145,10 +162,35 @@ function DashboardNavbar({ absolute, light, isMini }) {
               >
                 <Icon sx={iconsStyle}>settings</Icon>
               </IconButton>
-              <Link to="/NotificationComponent">
+              <Link
+                to="/NotificationComponent"
+                style={{ position: "relative", display: "inline-block" }}
+              >
                 <MDButton variant="gradient" color="info">
                   <Icon>notifications</Icon>&nbsp;Notifications
                 </MDButton>
+                {notifCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 6,
+                      right: 6,
+                      background: "red",
+                      color: "white",
+                      borderRadius: "50%",
+                      width: 20,
+                      height: 20,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      fontWeight: "bold",
+                    }}
+                    aria-label={`${notifCount} notifications`}
+                  >
+                    {notifCount}
+                  </span>
+                )}
               </Link>
               <MDButton color="error" size="small" sx={navbarIconButton} onClick={handleLogout}>
                 <Icon sx={iconsStyle}>logout</Icon>
