@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -35,6 +36,7 @@ const tableColumns = [
   { Header: "Adresse", accessor: "adresse", align: "center" },
   { Header: "Téléphone", accessor: "telephone", align: "center" },
   { Header: "Email", accessor: "email", align: "center" },
+  { Header: "Matricule Fiscale", accessor: "matriculeFiscale", align: "center" },
   { Header: "Type Fournisseur", accessor: "typeFournisseur", align: "center" },
   { Header: "Actions", accessor: "actions", align: "center" },
 ];
@@ -73,7 +75,7 @@ const FournisseurComponent = () => {
   const fetchFournisseurs = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/fournisseurs");
+      const res = await axios.get(`${API_BASE_URL}/api/fournisseurs`);
       const data = Array.isArray(res.data) ? res.data : [res.data];
       setFournisseurs(data);
     } catch (err) {
@@ -102,6 +104,7 @@ const FournisseurComponent = () => {
       delaiPaiement: "",
       modePaiement: "",
       compteBancaire: "",
+      matriculeFiscale: "",
       historiqueAchats: 0,
       remisesConditionsSpeciales: "",
       recherche: "",
@@ -126,7 +129,7 @@ const FournisseurComponent = () => {
 
   const handleView = async (fournisseur) => {
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/fournisseurs/${fournisseur._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/fournisseurs/${fournisseur._id}`);
       setCurrentFournisseur({
         ...res.data,
         recherche: res.data.recherche?.join(", ") || "",
@@ -144,7 +147,7 @@ const FournisseurComponent = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce fournisseur ?")) {
       try {
-        await axios.delete(`https://sbk-1.onrender.com/api/fournisseurs/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/fournisseurs/${id}`);
         setFournisseurs((prev) => prev.filter((fournisseur) => fournisseur._id !== id));
       } catch (err) {
         setError(err.response?.data?.error || "Échec de la suppression du fournisseur.");
@@ -184,9 +187,9 @@ const FournisseurComponent = () => {
     try {
       let response;
       if (isEditing) {
-        response = await axios.put(`https://sbk-1.onrender.com/api/fournisseurs/${_id}`, payload);
+        response = await axios.put(`${API_BASE_URL}/api/fournisseurs/${_id}`, payload);
       } else {
-        response = await axios.post("https://sbk-1.onrender.com/api/fournisseurs", payload);
+        response = await axios.post(`${API_BASE_URL}/api/fournisseurs`, payload);
       }
       fetchFournisseurs();
       setShowModal(false);
@@ -220,6 +223,7 @@ const FournisseurComponent = () => {
     adresse: fournisseur.adresse || "N/A",
     telephone: fournisseur.telephone || "N/A",
     email: fournisseur.email || "N/A",
+    matriculeFiscale: fournisseur.matriculeFiscale || "N/A",
     typeFournisseur: fournisseur.typeFournisseur || "N/A",
     actions: (
       <MDBox display="flex" justifyContent="center" alignItems="center" gap={1}>
@@ -380,6 +384,7 @@ const FournisseurComponent = () => {
                 { label: "Adresse", name: "adresse", type: "text", required: true },
                 { label: "Téléphone", name: "telephone", type: "text" },
                 { label: "Email", name: "email", type: "email" },
+                { label: "Matricule Fiscale", name: "matriculeFiscale", type: "text" },
                 { label: "Date d'Inscription", name: "dateInscription", type: "date" },
                 { label: "Nom du Contact", name: "nomContact", type: "text" },
                 { label: "Délai de Paiement", name: "delaiPaiement", type: "text" },
@@ -491,6 +496,7 @@ const FournisseurComponent = () => {
             {[
               { label: "N° Fournisseur", value: currentFournisseur.numeroFournisseur },
               { label: "Nom/Raison Sociale", value: currentFournisseur.nomRaisonSociale },
+              { label: "Matricule Fiscale", value: currentFournisseur.matriculeFiscale },
               { label: "Adresse", value: currentFournisseur.adresse },
               { label: "Téléphone", value: currentFournisseur.telephone },
               { label: "Email", value: currentFournisseur.email },

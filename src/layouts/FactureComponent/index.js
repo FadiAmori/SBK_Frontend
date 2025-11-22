@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -75,7 +76,7 @@ const FactureComponent = () => {
   const fetchFactures = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/factures");
+      const res = await axios.get(`${API_BASE_URL}/api/factures`);
       const data = Array.isArray(res.data) ? res.data : [res.data];
       setFactures(data);
     } catch (err) {
@@ -87,7 +88,7 @@ const FactureComponent = () => {
 
   const fetchProduits = async () => {
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/produits");
+      const res = await axios.get(`${API_BASE_URL}/api/produits`);
       setProduits(Array.isArray(res.data) ? res.data : [res.data]);
     } catch (err) {
       setError(err.response?.data?.error || "Échec de la récupération des produits.");
@@ -96,7 +97,7 @@ const FactureComponent = () => {
 
   const fetchClients = async () => {
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/clients");
+      const res = await axios.get(`${API_BASE_URL}/api/clients`);
       setClients(Array.isArray(res.data) ? res.data : [res.data]);
     } catch (err) {
       setError(err.response?.data?.error || "Échec de la récupération des clients.");
@@ -114,7 +115,7 @@ const FactureComponent = () => {
       return;
     }
     try {
-      const response = await axios.post("https://sbk-1.onrender.com/api/produits", {
+      const response = await axios.post(`${API_BASE_URL}/api/produits`, {
         ...newProduit,
         prixUnitaireHT: parseFloat(newProduit.prixUnitaireHT),
         tvaApplicable: parseFloat(newProduit.tvaApplicable),
@@ -192,42 +193,82 @@ const FactureComponent = () => {
   };
 
   const calculateTotalHT = () => {
-    const total = factureItems.reduce((total, item) => {
-      const produit = produits.find((p) => p._id === item.produit);
-      return total + (produit?.prixUnitaireHT || 0) * item.quantite;
+    const totalHTBeforeRemise = factureItems.reduce((total, item) => {
+      const produit = produits.find((p) => p._id === item.produit) || {};
+      return total + Number(produit.prixUnitaireHT || 0) * item.quantite;
     }, 0);
-    const remise = parseFloat(currentFacture.remise) || 0;
-    return total * (1 - remise / 100);
+    const totalTTCBeforeRemise = factureItems.reduce((total, item) => {
+      const produit = produits.find((p) => p._id === item.produit) || {};
+      const unitHT = Number(produit.prixUnitaireHT || 0);
+      const tvaPercent = Number(produit.tvaApplicable || 0);
+      return total + unitHT * (1 + tvaPercent / 100) * item.quantite;
+    }, 0);
+    const remiseAmount = parseFloat(currentFacture.remise) || 0;
+    const montantTTC = Math.max(0, totalTTCBeforeRemise - remiseAmount);
+    const discountFactor = totalTTCBeforeRemise > 0 ? montantTTC / totalTTCBeforeRemise : 0;
+    return totalHTBeforeRemise * discountFactor;
   };
 
   const calculateTVA = () => {
-    const totalHT = factureItems.reduce((total, item) => {
-      const produit = produits.find((p) => p._id === item.produit);
-      return total + (produit?.prixUnitaireHT || 0) * item.quantite;
+    const totalTVABeforeRemise = factureItems.reduce((total, item) => {
+      const produit = produits.find((p) => p._id === item.produit) || {};
+      const unitHT = Number(produit.prixUnitaireHT || 0);
+      const tvaPercent = Number(produit.tvaApplicable || 0);
+      return total + unitHT * (tvaPercent / 100) * item.quantite;
     }, 0);
-    const remise = parseFloat(currentFacture.remise) || 0;
-    const discountedHT = totalHT * (1 - remise / 100);
-    return factureItems.reduce((total, item) => {
-      const produit = produits.find((p) => p._id === item.produit);
-      return (
-        total +
-        (produit?.prixUnitaireHT || 0) *
-          ((produit?.tvaApplicable || 0) / 100) *
-          item.quantite *
-          (1 - remise / 100)
-      );
+    const totalTTCBeforeRemise = factureItems.reduce((total, item) => {
+      const produit = produits.find((p) => p._id === item.produit) || {};
+      const unitHT = Number(produit.prixUnitaireHT || 0);
+      const tvaPercent = Number(produit.tvaApplicable || 0);
+      return total + unitHT * (1 + tvaPercent / 100) * item.quantite;
     }, 0);
+    const remiseAmount = parseFloat(currentFacture.remise) || 0;
+    const montantTTC = Math.max(0, totalTTCBeforeRemise - remiseAmount);
+    const discountFactor = totalTTCBeforeRemise > 0 ? montantTTC / totalTTCBeforeRemise : 0;
+    return totalTVABeforeRemise * discountFactor;
   };
 
   const calculateTotalTTC = () => {
-    return calculateTotalHT() + calculateTVA();
+    // Compute directly: sum of unit TTC per item minus remise (DT)
+    const totalTTCBeforeRemise = factureItems.reduce((total, item) => {
+      const produit = produits.find((p) => p._id === item.produit) || {};
+      const unitHT = Number(produit.prixUnitaireHT || 0);
+      const tvaPercent = Number(produit.tvaApplicable || 0);
+      return total + unitHT * (1 + tvaPercent / 100) * item.quantite;
+    }, 0);
+    const remiseAmount = parseFloat(currentFacture.remise) || 0;
+    return Math.max(0, totalTTCBeforeRemise - remiseAmount);
+  };
+
+  const calculateMargeBrute = () => {
+    // Compute total TTC before remise, total prix d'achat, then apply formula:
+    // margeBrute = totalTTC_beforeRemise - remise - totalPrixAchat
+    const totals = factureItems.reduce(
+      (acc, item) => {
+        const produit = produits.find((p) => p._id === item.produit) || {};
+        const unitHT = Number(produit.prixUnitaireHT || 0);
+        const tvaPercent = Number(produit.tvaApplicable || 0);
+        const unitTTC = unitHT * (1 + tvaPercent / 100);
+        acc.totalTTCBeforeRemise += unitTTC * item.quantite;
+        acc.totalPrixAchat += Number(produit.prixAchat || 0) * item.quantite;
+        return acc;
+      },
+      { totalTTCBeforeRemise: 0, totalPrixAchat: 0 }
+    );
+    const remiseAmount = parseFloat(currentFacture.remise) || 0;
+    return totals.totalTTCBeforeRemise - remiseAmount - totals.totalPrixAchat;
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setCurrentFacture((prev) => ({
       ...prev,
-      [name]: name === "remise" ? (value === "" ? 0 : parseFloat(value) || 0) : value,
+      [name]:
+        name === "remise" || name === "montantDonne"
+          ? value === ""
+            ? 0
+            : parseFloat(value) || 0
+          : value,
     }));
     console.log("Current Facture State:", { ...currentFacture, [name]: value }); // Debug
   };
@@ -263,7 +304,7 @@ const FactureComponent = () => {
   const handleEditFacture = async (facture) => {
     setIsEditing(true);
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/factures/${facture._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/factures/${facture._id}`);
       setCurrentFacture({
         ...res.data,
         dateFacturation: res.data.dateFacturation
@@ -299,7 +340,7 @@ const FactureComponent = () => {
 
   const handleViewFacture = async (facture) => {
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/factures/${facture._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/factures/${facture._id}`);
       setCurrentFacture({
         ...res.data,
         dateFacturation: res.data.dateFacturation
@@ -335,7 +376,7 @@ const FactureComponent = () => {
   const handleDeleteFacture = async (id) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer cette facture ?")) {
       try {
-        await axios.delete(`https://sbk-1.onrender.com/api/factures/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/factures/${id}`);
         setFactures((prev) => prev.filter((facture) => facture._id !== id));
       } catch (err) {
         setError(err.response?.data?.error || "Échec de la suppression de la facture.");
@@ -358,6 +399,9 @@ const FactureComponent = () => {
     payload.tva = calculateTVA();
     payload.montantTTC = calculateTotalTTC();
     payload.remise = parseFloat(currentFacture.remise) || 0;
+    payload.montantDonne = parseFloat(currentFacture.montantDonne) || 0;
+    payload.montantRester = Math.max(0, payload.montantTTC - payload.montantDonne);
+    payload.margeBrute = calculateMargeBrute();
     payload.liste = factureItems.map((item) => ({
       produit: item.produit,
       quantite: item.quantite,
@@ -380,13 +424,11 @@ const FactureComponent = () => {
     try {
       let response;
       if (isEditing) {
-        response = await axios.put(`https://sbk-1.onrender.com/api/factures/${_id}`, payload);
+        response = await axios.put(`${API_BASE_URL}/api/factures/${_id}`, payload);
       } else {
-        response = await axios.post("https://sbk-1.onrender.com/api/factures", payload);
+        response = await axios.post(`${API_BASE_URL}/api/factures`, payload);
       }
-      const populatedFacture = await axios.get(
-        `https://sbk-1.onrender.com/api/factures/${response.data._id}`
-      );
+      const populatedFacture = await axios.get(`${API_BASE_URL}/api/factures/${response.data._id}`);
       generatePDF(populatedFacture.data);
       fetchFactures();
       setShowFactureModal(false);
@@ -449,6 +491,11 @@ const FactureComponent = () => {
           logoY + logoHeight + 20
         );
         doc.text(
+          `Matricule Fiscale: ${clientData.matriculeFiscale || "N/A"}`,
+          margin,
+          logoY + logoHeight + 25
+        );
+        doc.text(
           `Numéro Facture: ${facture.numeroFacture || "N/A"}`,
           margin,
           logoY + logoHeight + 30
@@ -506,6 +553,7 @@ const FactureComponent = () => {
 
       const itemsFinalY = doc.lastAutoTable.finalY || logoY + logoHeight + 60;
       const totalsStartY = itemsFinalY + 10;
+      // PDF totals: only show Montant HT brut, TVA and Montant TTC
       const totalsBody = [
         [
           "Montant HT brut",
@@ -516,15 +564,10 @@ const FactureComponent = () => {
             }, 0)
             .toFixed(2)} DT`,
         ],
-      ];
-      if (facture.remise && facture.remise > 0) {
-        totalsBody.push(["Remise", `${Number(facture.remise).toFixed(2)}%`]);
-        totalsBody.push(["Montant HT net", `${(facture.montantHT || 0).toFixed(2)} DT`]);
-      }
-      totalsBody.push(
         ["TVA", `${(facture.tva || 0).toFixed(2)} DT`],
-        ["Montant TTC", `${(facture.montantTTC || 0).toFixed(2)} DT`]
-      );
+        ["Montant Remisé", `${(facture.remise || 0).toFixed(2)} DT`],
+        ["Montant TTC", `${(facture.montantTTC || 0).toFixed(2)} DT`],
+      ];
 
       autoTable(doc, {
         startY: totalsStartY,
@@ -562,6 +605,9 @@ const FactureComponent = () => {
     { Header: "Client", accessor: "client", align: "center" },
     { Header: "Date Facturation", accessor: "dateFacturation", align: "center" },
     { Header: "Montant TTC", accessor: "montantTTC", align: "center" },
+    { Header: "Montant donné", accessor: "montantDonne", align: "center" },
+    { Header: "Montant restant", accessor: "montantRester", align: "center" },
+    { Header: "Marge brute", accessor: "margeBrute", align: "center" },
     { Header: "Statut", accessor: "statut", align: "center" },
     { Header: "Type Facture", accessor: "typeFacture", align: "center" },
     { Header: "Actions", accessor: "actions", align: "center" },
@@ -574,6 +620,38 @@ const FactureComponent = () => {
       ? new Date(facture.dateFacturation).toLocaleDateString()
       : "N/A",
     montantTTC: `${(facture.montantTTC || 0).toFixed(2)} DT`,
+    montantDonne: `${(Number(facture.montantDonne) || 0).toFixed(2)} DT`,
+    montantRester: `${Math.max(
+      0,
+      (Number(facture.montantTTC) || 0) - (Number(facture.montantDonne) || 0)
+    ).toFixed(2)} DT`,
+    margeBrute: `${(() => {
+      try {
+        if (facture.margeBrute !== undefined && facture.margeBrute !== null)
+          return Number(facture.margeBrute).toFixed(2) + " DT";
+        const totalTTCBeforeRemise = (facture.liste || []).reduce((total, item) => {
+          const prod =
+            item.produit && typeof item.produit === "object"
+              ? item.produit
+              : produits.find((p) => p._id === (item.produit?._id || item.produit)) || {};
+          const unitHT = Number(prod.prixUnitaireHT || 0);
+          const tva = Number(prod.tvaApplicable || 0);
+          return total + unitHT * (1 + tva / 100) * (item.quantite || 0);
+        }, 0);
+        const totalPrixAchat = (facture.liste || []).reduce((total, item) => {
+          const prod =
+            item.produit && typeof item.produit === "object"
+              ? item.produit
+              : produits.find((p) => p._id === (item.produit?._id || item.produit)) || {};
+          return total + Number(prod.prixAchat || 0) * (item.quantite || 0);
+        }, 0);
+        const remiseAmount = Number(facture.remise) || 0;
+        const marge = totalTTCBeforeRemise - remiseAmount - totalPrixAchat;
+        return marge.toFixed(2) + " DT";
+      } catch (e) {
+        return "0.00 DT";
+      }
+    })()}`,
     statut: facture.statut || "N/A",
     typeFacture: facture.typeFacture || "N/A",
     actions: (
@@ -619,8 +697,10 @@ const FactureComponent = () => {
     const produit = produits.find((p) => p._id === item.produit);
     const unitPrice = produit?.prixUnitaireHT || 0;
     const tva = produit?.tvaApplicable || 0;
-    const remise = parseFloat(currentFacture.remise) || 0;
-    const totalPrice = unitPrice * item.quantite * (1 + tva / 100) * (1 - remise / 100);
+    // Do NOT apply the global remise to per-line totals here.
+    // The invoice remise is shown and applied at the totals level only.
+    const itemHT = unitPrice * item.quantite;
+    const totalPrice = itemHT * (1 + tva / 100);
     return {
       designation: produit?.nomProduit || "Inconnu",
       quantite: (
@@ -658,6 +738,8 @@ const FactureComponent = () => {
     boxShadow: 24,
     p: 4,
     borderRadius: 2,
+    maxHeight: "80vh",
+    overflowY: "auto",
   };
 
   const handleClearFilters = () => {
@@ -776,7 +858,8 @@ const FactureComponent = () => {
                 { label: "Date Échéance", name: "dateEcheance", type: "date" },
                 { label: "Date Règlement", name: "dateReglement", type: "date" },
                 { label: "Recherche (séparé par virgules)", name: "recherche", type: "text" },
-                { label: "Remise (%)", name: "remise", type: "number" },
+                { label: "Remise (DT)", name: "remise", type: "number" },
+                { label: "Montant donné (DT)", name: "montantDonne", type: "number" },
               ].map(({ label, name, type, required }) => (
                 <Grid item xs={6} key={name}>
                   <MDTypography variant="body2" fontWeight="bold" mb={1}>
@@ -874,7 +957,7 @@ const FactureComponent = () => {
                   variant="outlined"
                   required
                 >
-                  {["BL", "Client", "Bonde de Livraison"].map((type) => (
+                  {["Client", "Bon de Livraison"].map((type) => (
                     <MenuItem key={type} value={type}>
                       {type}
                     </MenuItem>
@@ -908,9 +991,24 @@ const FactureComponent = () => {
               {factureItems.length > 0 && (
                 <MDBox mt={2} display="flex" justifyContent="flex-end" gap={2}>
                   {Number(currentFacture.remise) > 0 && (
-                    <MDTypography variant="h6" fontWeight="medium">
-                      Remise: {(Number(currentFacture.remise) || 0).toFixed(2)}%
-                    </MDTypography>
+                    <MDBox>
+                      <MDTypography variant="h6" fontWeight="medium">
+                        Remise: {(Number(currentFacture.remise) || 0).toFixed(2)} DT
+                      </MDTypography>
+                      <MDTypography variant="h6" fontWeight="medium">
+                        Montant donné: {(Number(currentFacture.montantDonne) || 0).toFixed(2)} DT
+                      </MDTypography>
+                      <MDTypography variant="h6" fontWeight="medium">
+                        Montant restant:{" "}
+                        {(calculateTotalTTC() - (Number(currentFacture.montantDonne) || 0)).toFixed(
+                          2
+                        )}{" "}
+                        DT
+                      </MDTypography>
+                      <MDTypography variant="h6" fontWeight="medium">
+                        Marge brute: {calculateMargeBrute().toFixed(2)} DT
+                      </MDTypography>
+                    </MDBox>
                   )}
                   <MDTypography variant="h6" fontWeight="medium">
                     Total TTC: {calculateTotalTTC().toFixed(2)} DT
@@ -1161,11 +1259,7 @@ const FactureComponent = () => {
                     },
                     {
                       label: "Remise",
-                      value: `${(Number(currentFacture.remise) || 0).toFixed(2)}%`,
-                    },
-                    {
-                      label: "Montant HT net",
-                      value: `${(currentFacture.montantHT || 0).toFixed(2)} DT`,
+                      value: `${(Number(currentFacture.remise) || 0).toFixed(2)} DT`,
                     },
                   ]
                 : [
@@ -1176,6 +1270,26 @@ const FactureComponent = () => {
                   ]),
               { label: "TVA", value: `${(currentFacture.tva || 0).toFixed(2)} DT` },
               { label: "Montant TTC", value: `${(currentFacture.montantTTC || 0).toFixed(2)} DT` },
+              {
+                label: "Montant donné",
+                value: `${(Number(currentFacture.montantDonne) || 0).toFixed(2)} DT`,
+              },
+              {
+                label: "Montant restant",
+                value: `${Math.max(
+                  0,
+                  (Number(currentFacture.montantTTC) || 0) -
+                    (Number(currentFacture.montantDonne) || 0)
+                ).toFixed(2)} DT`,
+              },
+              {
+                label: "Marge brute",
+                value: `${(currentFacture.margeBrute !== undefined &&
+                currentFacture.margeBrute !== null
+                  ? Number(currentFacture.margeBrute)
+                  : calculateMargeBrute()
+                ).toFixed(2)} DT`,
+              },
               { label: "Recherche", value: currentFacture.recherche || "N/A" },
             ].map(({ label, value }) => (
               <Grid item xs={6} key={label}>

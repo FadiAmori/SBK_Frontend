@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 import { Grid, Select, MenuItem, CircularProgress, TextField, IconButton } from "@mui/material";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
@@ -55,13 +56,13 @@ function Dashboard() {
           facturesAchatRes,
           resumesRes,
         ] = await Promise.all([
-          axios.get("https://sbk-1.onrender.com/api/clients"),
-          axios.get("https://sbk-1.onrender.com/api/fournisseurs"),
-          axios.get("https://sbk-1.onrender.com/api/produits"),
-          axios.get("https://sbk-1.onrender.com/api/factures"),
-          axios.get("https://sbk-1.onrender.com/api/factureAchats"),
-          axios.get("https://sbk-1.onrender.com/api/resumes-comptables"),
-          axios.post("https://sbk-1.onrender.com/api/resumes-comptables"), // Generate résumés
+          axios.get(`${API_BASE_URL}/api/clients`),
+          axios.get(`${API_BASE_URL}/api/fournisseurs`),
+          axios.get(`${API_BASE_URL}/api/produits`),
+          axios.get(`${API_BASE_URL}/api/factures`),
+          axios.get(`${API_BASE_URL}/api/factureAchats`),
+          axios.get(`${API_BASE_URL}/api/resumes-comptables`),
+          axios.post(`${API_BASE_URL}/api/resumes-comptables`), // Generate résumés
         ]);
         setClients(Array.isArray(clientsRes.data) ? clientsRes.data : [clientsRes.data]);
         setFournisseurs(
@@ -108,6 +109,32 @@ function Dashboard() {
 
   // Filter résumés based on period and type
   const filteredResumes = useMemo(() => {
+    // If periodeType is 'month', compare by month indices instead of exact dates.
+    if (periodeType === "month") {
+      const start = startDate ? new Date(startDate) : null;
+      const endRaw = endDate ? new Date(endDate) : null;
+      // Interpret an end date that falls on the 1st of a month as "end of previous month",
+      // which matches users selecting month boundaries like 01/11 -> 01/12 intending November only.
+      const end = endRaw
+        ? endRaw.getDate() === 1
+          ? new Date(endRaw.getFullYear(), endRaw.getMonth() - 1, 1)
+          : new Date(endRaw.getFullYear(), endRaw.getMonth(), 1)
+        : null;
+
+      const startMonthIndex = start ? start.getFullYear() * 12 + start.getMonth() : null;
+      const endMonthIndex = end ? end.getFullYear() * 12 + end.getMonth() : null;
+
+      return resumesComptables.filter((resume) => {
+        if (periodeType && resume.periodeType !== periodeType) return false;
+        const r = new Date(resume.periode);
+        const resumeMonthIndex = r.getFullYear() * 12 + r.getMonth();
+        if (startMonthIndex != null && resumeMonthIndex < startMonthIndex) return false;
+        if (endMonthIndex != null && resumeMonthIndex > endMonthIndex) return false;
+        return true;
+      });
+    }
+
+    // Default behavior: exact inclusive date comparison
     return resumesComptables.filter((resume) => {
       const resumeDate = new Date(resume.periode);
       const start = startDate ? new Date(startDate) : null;
@@ -136,7 +163,7 @@ function Dashboard() {
         setError("Frais généraux doit être un nombre positif.");
         return;
       }
-      await axios.put(`https://sbk-1.onrender.com/api/resumes-comptables/${id}`, { fraisGeneraux });
+      await axios.put(`${API_BASE_URL}/api/resumes-comptables/${id}`, { fraisGeneraux });
       setResumesComptables((prev) =>
         prev.map((resume) =>
           resume._id === id
@@ -205,6 +232,35 @@ function Dashboard() {
       })
       .filter((d) => d.value > 0);
   }, [produits, filteredFactures]);
+
+  // Totals for charts
+  const totalClientSales = useMemo(() => {
+    return clientPurchaseData.reduce((sum, d) => sum + Number(d.value || 0), 0);
+  }, [clientPurchaseData]);
+
+  const totalFournisseurPurchase = useMemo(() => {
+    return fournisseurPurchaseData.reduce((sum, d) => sum + Number(d.value || 0), 0);
+  }, [fournisseurPurchaseData]);
+
+  const totalProductSales = useMemo(() => {
+    return productSalesData.reduce((sum, d) => sum + Number(d.value || 0), 0);
+  }, [productSalesData]);
+
+  // Calculate client credit percentages (share of total credits)
+  const clientCreditData = useMemo(() => {
+    const data = clients
+      .map((client) => ({
+        name: client.nomRaisonSociale || "Inconnu",
+        value: Number(client.credit || 0),
+      }))
+      .filter((d) => d.value > 0);
+    return data;
+  }, [clients]);
+
+  // Total credit amount across all clients
+  const totalClientCredit = useMemo(() => {
+    return clients.reduce((sum, c) => sum + Number(c.credit || 0), 0);
+  }, [clients]);
 
   // Calculate invoices per day for selected client
   const getInvoicesPerDay = () => {
@@ -294,10 +350,13 @@ function Dashboard() {
 
           <MDBox mt={6}>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={15} md={6}>
                 <MDBox mb={3} p={2} sx={{ backgroundColor: "#fff", borderRadius: 2, boxShadow: 1 }}>
                   <MDTypography variant="h6" fontWeight="bold" color="text.primary" mb={2}>
                     Répartition des Ventes par Client (%)
+                  </MDTypography>
+                  <MDTypography variant="body2" color="text.secondary" mb={2}>
+                    Total Ventes: {Number(totalClientSales || 0).toFixed(2)} DT
                   </MDTypography>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
@@ -322,10 +381,13 @@ function Dashboard() {
                   </ResponsiveContainer>
                 </MDBox>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={15} md={6}>
                 <MDBox mb={3} p={2} sx={{ backgroundColor: "#fff", borderRadius: 2, boxShadow: 1 }}>
                   <MDTypography variant="h6" fontWeight="bold" color="text.primary" mb={2}>
                     Répartition des Achats par Fournisseur (%)
+                  </MDTypography>
+                  <MDTypography variant="body2" color="text.secondary" mb={2}>
+                    Total Achats: {Number(totalFournisseurPurchase || 0).toFixed(2)} DT
                   </MDTypography>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
@@ -350,10 +412,13 @@ function Dashboard() {
                   </ResponsiveContainer>
                 </MDBox>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={15} md={6}>
                 <MDBox mb={3} p={2} sx={{ backgroundColor: "#fff", borderRadius: 2, boxShadow: 1 }}>
                   <MDTypography variant="h6" fontWeight="bold" color="text.primary" mb={2}>
                     Répartition des Ventes par Produit (%)
+                  </MDTypography>
+                  <MDTypography variant="body2" color="text.secondary" mb={2}>
+                    Total Ventes Produits: {Number(totalProductSales || 0).toFixed(2)} DT
                   </MDTypography>
                   {productSalesData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>
@@ -382,6 +447,46 @@ function Dashboard() {
                   ) : (
                     <MDTypography variant="body2" color="text.secondary">
                       Aucune donnée disponible pour les ventes par produit.
+                    </MDTypography>
+                  )}
+                </MDBox>
+              </Grid>
+              <Grid item xs={15} md={6}>
+                <MDBox mb={3} p={2} sx={{ backgroundColor: "#fff", borderRadius: 2, boxShadow: 1 }}>
+                  <MDTypography variant="h6" fontWeight="bold" color="text.primary" mb={2}>
+                    Répartition du Crédit Clients (%)
+                  </MDTypography>
+                  <MDTypography variant="body2" color="text.secondary" mb={2}>
+                    Total Crédit: {Number(totalClientCredit || 0).toFixed(2)} DT
+                  </MDTypography>
+                  {clientCreditData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={clientCreditData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={100}
+                          fill="#9E9E9E"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
+                        >
+                          {clientCreditData.map((entry, index) => (
+                            <Cell
+                              key={`credit-cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => `${value.toFixed(2)} DT`} />
+                        <Legend wrapperStyle={{ fontSize: "14px", paddingTop: "10px" }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <MDTypography variant="body2" color="text.secondary">
+                      Aucun crédit client disponible.
                     </MDTypography>
                   )}
                 </MDBox>

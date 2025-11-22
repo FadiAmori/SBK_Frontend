@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -27,7 +28,7 @@ const tableColumns = [
   { Header: "Nom", accessor: "nomProduit", align: "center" },
   { Header: "Catégorie", accessor: "categorie", align: "center" },
   { Header: "Prix d'Achat (DT)", accessor: "prixAchat", align: "center" },
-  { Header: "Prix Unitaire HT (DT)", accessor: "prixUnitaireHT", align: "center" },
+  { Header: "Prix Unitaire TTC (DT)", accessor: "prixUnitaireTTC", align: "center" },
   { Header: "Marge (%)", accessor: "margeDegagnante", align: "center" },
   { Header: "TVA (%)", accessor: "tvaApplicable", align: "center" },
   { Header: "Stock Actuel", accessor: "stockActuel", align: "center" },
@@ -55,6 +56,7 @@ const ProduitComponent = () => {
     prixAchat: "",
     prixUnitaireHT: "",
     margeDegagnante: "",
+    margeEnDT: "",
     tvaApplicable: "",
     stockActuel: "",
     stockMinimal: "",
@@ -91,7 +93,7 @@ const ProduitComponent = () => {
   const fetchProduits = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/produits");
+      const res = await axios.get(`${API_BASE_URL}/api/produits`);
       const data = Array.isArray(res.data) ? res.data : [res.data];
       setProduits(data);
     } catch (err) {
@@ -103,7 +105,7 @@ const ProduitComponent = () => {
 
   const fetchFournisseurs = async () => {
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/fournisseurs");
+      const res = await axios.get(`${API_BASE_URL}/api/fournisseurs`);
       setFournisseurs(Array.isArray(res.data) ? res.data : [res.data]);
     } catch (err) {
       setError(err.response?.data?.error || "Échec de la récupération des fournisseurs.");
@@ -129,6 +131,7 @@ const ProduitComponent = () => {
       categorie: "",
       description: "",
       prixAchat: "",
+      prixUnitaireTTC: "",
       prixUnitaireHT: "",
       margeDegagnante: "",
       tvaApplicable: "",
@@ -156,9 +159,24 @@ const ProduitComponent = () => {
       categorie: produit.categorie || "",
       description: produit.description || "",
       prixAchat: produit.prixAchat !== undefined ? produit.prixAchat.toString() : "",
+      prixUnitaireTTC:
+        produit.prixUnitaireTTC !== undefined && produit.prixUnitaireTTC !== null
+          ? produit.prixUnitaireTTC.toString()
+          : "",
       prixUnitaireHT: produit.prixUnitaireHT !== undefined ? produit.prixUnitaireHT.toString() : "",
       margeDegagnante:
         produit.margeDegagnante !== undefined ? produit.margeDegagnante.toString() : "",
+      margeEnDT:
+        produit.margeEnDT !== undefined && produit.margeEnDT !== null
+          ? produit.margeEnDT.toString()
+          : produit.prixUnitaireTTC
+          ? (Number(produit.prixUnitaireTTC) - Number(produit.prixAchat || 0)).toString()
+          : produit.prixUnitaireHT
+          ? (
+              Number(produit.prixUnitaireHT) * (1 + Number(produit.tvaApplicable || 0) / 100) -
+              Number(produit.prixAchat || 0)
+            ).toString()
+          : "",
       tvaApplicable: produit.tvaApplicable !== undefined ? produit.tvaApplicable.toString() : "",
       stockActuel: produit.stockActuel !== undefined ? produit.stockActuel.toString() : "",
       stockMinimal: produit.stockMinimal !== undefined ? produit.stockMinimal.toString() : "",
@@ -182,7 +200,7 @@ const ProduitComponent = () => {
 
   const handleView = async (produit) => {
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/produits/${produit._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/produits/${produit._id}`);
       setCurrentProduit({
         _id: res.data._id || "",
         referenceProduit: res.data.referenceProduit || "",
@@ -190,10 +208,25 @@ const ProduitComponent = () => {
         categorie: res.data.categorie || "",
         description: res.data.description || "",
         prixAchat: res.data.prixAchat !== undefined ? res.data.prixAchat.toString() : "",
+        prixUnitaireTTC:
+          res.data.prixUnitaireTTC !== undefined && res.data.prixUnitaireTTC !== null
+            ? res.data.prixUnitaireTTC.toString()
+            : "",
         prixUnitaireHT:
           res.data.prixUnitaireHT !== undefined ? res.data.prixUnitaireHT.toString() : "",
         margeDegagnante:
           res.data.margeDegagnante !== undefined ? res.data.margeDegagnante.toString() : "",
+        margeEnDT:
+          res.data.margeEnDT !== undefined && res.data.margeEnDT !== null
+            ? res.data.margeEnDT.toString()
+            : res.data.prixUnitaireTTC
+            ? (Number(res.data.prixUnitaireTTC) - Number(res.data.prixAchat || 0)).toString()
+            : res.data.prixUnitaireHT
+            ? (
+                Number(res.data.prixUnitaireHT) * (1 + Number(res.data.tvaApplicable || 0) / 100) -
+                Number(res.data.prixAchat || 0)
+              ).toString()
+            : "",
         tvaApplicable:
           res.data.tvaApplicable !== undefined ? res.data.tvaApplicable.toString() : "",
         stockActuel: res.data.stockActuel !== undefined ? res.data.stockActuel.toString() : "",
@@ -280,7 +313,7 @@ const ProduitComponent = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) {
       try {
-        await axios.delete(`https://sbk-1.onrender.com/api/produits/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/produits/${id}`);
         setProduits((prev) => prev.filter((produit) => produit._id !== id));
         setError("");
       } catch (err) {
@@ -297,8 +330,10 @@ const ProduitComponent = () => {
     if (
       [
         "prixAchat",
+        "prixUnitaireTTC",
         "prixUnitaireHT",
         "margeDegagnante",
+        "margeEnDT",
         "tvaApplicable",
         "stockActuel",
         "stockMinimal",
@@ -317,16 +352,101 @@ const ProduitComponent = () => {
       if (name === "prixAchat" && Number(newValue) > 0) {
         const margeDegagnante = Number(prev.margeDegagnante) || 0;
         updatedProduit.prixUnitaireHT = (Number(newValue) * (1 + margeDegagnante / 100)).toFixed(2);
+        // Recompute TTC if TVA is present
+        const tvaForAchat = Number(prev.tvaApplicable) || 0;
+        if (!isNaN(tvaForAchat)) {
+          const ht = Number(updatedProduit.prixUnitaireHT) || 0;
+          updatedProduit.prixUnitaireTTC = (ht * (1 + tvaForAchat / 100)).toFixed(2);
+          // Recompute monetary margin and percent based on TTC when possible
+          const prixAchatNum = Number(newValue) || 0;
+          const ttcFromAchat = Number(updatedProduit.prixUnitaireTTC) || 0;
+          if (prixAchatNum > 0 && ttcFromAchat > 0) {
+            updatedProduit.margeEnDT = (ttcFromAchat - prixAchatNum).toFixed(2);
+            updatedProduit.margeDegagnante = (
+              ((ttcFromAchat - prixAchatNum) / prixAchatNum) *
+              100
+            ).toFixed(2);
+          }
+        }
       } else if (name === "margeDegagnante" && Number(newValue) >= 0) {
         const prixAchat = Number(prev.prixAchat) || 0;
         if (prixAchat > 0) {
           updatedProduit.prixUnitaireHT = (prixAchat * (1 + Number(newValue) / 100)).toFixed(2);
+          const tvaForMarge = Number(prev.tvaApplicable) || 0;
+          if (!isNaN(tvaForMarge)) {
+            const ht = Number(updatedProduit.prixUnitaireHT) || 0;
+            updatedProduit.prixUnitaireTTC = (ht * (1 + tvaForMarge / 100)).toFixed(2);
+          }
+        }
+      } else if (name === "prixUnitaireTTC" && Number(newValue) > 0) {
+        // Compute HT from TTC when TVA is available
+        const tva = Number(prev.tvaApplicable) || 0;
+        if (!isNaN(tva)) {
+          const ht = Number(newValue) / (1 + tva / 100);
+          updatedProduit.prixUnitaireHT = ht.toFixed(2);
+        }
+        // compute difference TTC - prixAchat and percent based on TTC
+        const prixAchatVal = Number(prev.prixAchat) || 0;
+        if (prixAchatVal > 0) {
+          const ttcValNew = Number(newValue);
+          updatedProduit.margeEnDT = (ttcValNew - prixAchatVal).toFixed(2);
+          updatedProduit.margeDegagnante = (
+            ((ttcValNew - prixAchatVal) / prixAchatVal) *
+            100
+          ).toFixed(2);
         }
       } else if (name === "prixUnitaireHT" && Number(newValue) > 0) {
         const prixAchat = Number(prev.prixAchat) || 0;
         if (prixAchat > 0 && Number(newValue) >= prixAchat) {
+          // Prefer computing margin percent from TTC if we can compute it, else fall back to HT
+          const tvaWhenHT = Number(prev.tvaApplicable) || 0;
+          const ttcComputedFromHT = Number(newValue) * (1 + tvaWhenHT / 100);
+          updatedProduit.prixUnitaireTTC = ttcComputedFromHT.toFixed(2);
           updatedProduit.margeDegagnante = (
-            ((Number(newValue) - prixAchat) / prixAchat) *
+            ((ttcComputedFromHT - prixAchat) / prixAchat) *
+            100
+          ).toFixed(2);
+        }
+        // Also compute TTC from HT using TV A
+        const tvaWhenHT = Number(prev.tvaApplicable) || 0;
+        if (!isNaN(tvaWhenHT)) {
+          const ttc = Number(newValue) * (1 + tvaWhenHT / 100);
+          updatedProduit.prixUnitaireTTC = ttc.toFixed(2);
+        }
+      } else if (name === "tvaApplicable" && prev.prixUnitaireTTC) {
+        // Recompute HT if TTC exists and TVA changed
+        const tva = Number(newValue) || 0;
+        const ttc = Number(prev.prixUnitaireTTC) || 0;
+        if (ttc > 0) {
+          const ht = ttc / (1 + tva / 100);
+          updatedProduit.prixUnitaireHT = ht.toFixed(2);
+        }
+        // If no TTC but HT exists, recompute TTC
+        else if (prev.prixUnitaireHT) {
+          const ht = Number(prev.prixUnitaireHT) || 0;
+          const ttc = ht * (1 + (Number(newValue) || 0) / 100);
+          updatedProduit.prixUnitaireTTC = ttc.toFixed(2);
+        }
+      }
+
+      // Ensure margeEnDT is present when possible (if TTC missing compute from HT)
+      const prixAchatVal2 = Number(updatedProduit.prixAchat) || 0;
+      const ttcVal = Number(updatedProduit.prixUnitaireTTC) || 0;
+      const htValFinal = Number(updatedProduit.prixUnitaireHT) || 0;
+      if (prixAchatVal2 > 0) {
+        if (ttcVal > 0) {
+          updatedProduit.margeEnDT = (ttcVal - prixAchatVal2).toFixed(2);
+          // percent based on TTC
+          updatedProduit.margeDegagnante = (
+            ((ttcVal - prixAchatVal2) / prixAchatVal2) *
+            100
+          ).toFixed(2);
+        } else if (htValFinal > 0) {
+          const tvaFinal = Number(updatedProduit.tvaApplicable) || 0;
+          const ttcComputed = htValFinal * (1 + tvaFinal / 100);
+          updatedProduit.margeEnDT = (ttcComputed - prixAchatVal2).toFixed(2);
+          updatedProduit.margeDegagnante = (
+            ((ttcComputed - prixAchatVal2) / prixAchatVal2) *
             100
           ).toFixed(2);
         }
@@ -344,8 +464,19 @@ const ProduitComponent = () => {
       currentProduit;
 
     payload.prixAchat = Number(payload.prixAchat);
+    payload.prixUnitaireTTC = payload.prixUnitaireTTC ? Number(payload.prixUnitaireTTC) : null;
     payload.prixUnitaireHT = Number(payload.prixUnitaireHT);
-    payload.margeDegagnante = Number(payload.margeDegagnante);
+    // Ensure we store the monetary margin (DT) and compute percent from it
+    payload.margeEnDT =
+      payload.margeEnDT !== undefined && payload.margeEnDT !== ""
+        ? Number(payload.margeEnDT)
+        : payload.prixUnitaireTTC
+        ? Number(payload.prixUnitaireTTC) - Number(payload.prixAchat || 0)
+        : Number(payload.prixUnitaireHT || 0) * (1 + Number(payload.tvaApplicable || 0) / 100) -
+          Number(payload.prixAchat || 0);
+    payload.margeDegagnante = Number(payload.prixAchat)
+      ? (Number(payload.margeEnDT) / Number(payload.prixAchat)) * 100
+      : 0;
     payload.tvaApplicable = Number(payload.tvaApplicable);
     payload.stockActuel = Number(payload.stockActuel) || 0;
     payload.stockMinimal = Number(payload.stockMinimal) || 0;
@@ -369,8 +500,8 @@ const ProduitComponent = () => {
       setRetryButtonVisible(false);
       return;
     }
-    if (payload.margeDegagnante < 0) {
-      setError("La marge dégagnante ne peut pas être négative.");
+    if (payload.margeEnDT < 0) {
+      setError("La marge (DT) ne peut pas être négative.");
       setRetryButtonVisible(false);
       return;
     }
@@ -379,11 +510,7 @@ const ProduitComponent = () => {
       setRetryButtonVisible(false);
       return;
     }
-    if (payload.prixUnitaireHT < payload.prixAchat) {
-      setError("Le prix unitaire HT doit être supérieur ou égal au prix d'achat.");
-      setRetryButtonVisible(false);
-      return;
-    }
+    // Removed validation: allow prixUnitaireHT to be lower than prixAchat (user requested)
 
     payload.recherche = recherche
       ? recherche
@@ -402,9 +529,9 @@ const ProduitComponent = () => {
     try {
       let response;
       if (isEditing) {
-        response = await axios.put(`https://sbk-1.onrender.com/api/produits/${_id}`, payload);
+        response = await axios.put(`${API_BASE_URL}/api/produits/${_id}`, payload);
       } else {
-        response = await axios.post("https://sbk-1.onrender.com/api/produits", payload);
+        response = await axios.post(`${API_BASE_URL}/api/produits`, payload);
       }
       fetchProduits();
       setShowModal(false);
@@ -442,6 +569,11 @@ const ProduitComponent = () => {
   };
 
   const filteredProduits = produits.filter((produit) => {
+    // compute unit TTC for filtering/searching: prefer prixUnitaireTTC when present, otherwise derive from HT + TVA
+    const unitTTC =
+      produit.prixUnitaireTTC !== undefined && produit.prixUnitaireTTC !== null
+        ? Number(produit.prixUnitaireTTC)
+        : Number(produit.prixUnitaireHT || 0) * (1 + Number(produit.tvaApplicable || 0) / 100);
     const query = searchQuery.toLowerCase();
     const matchesSearch = query
       ? produit.referenceProduit.toLowerCase().includes(query) ||
@@ -449,8 +581,10 @@ const ProduitComponent = () => {
         (produit.categorie?.toLowerCase().includes(query) ?? false) ||
         (produit.description?.toLowerCase().includes(query) ?? false) ||
         produit.prixAchat.toString().includes(query) ||
-        produit.prixUnitaireHT.toString().includes(query) ||
-        produit.margeDegagnante.toString().includes(query) ||
+        String(unitTTC).toString().includes(query) ||
+        (produit.margeEnDT
+          ? produit.margeEnDT.toString().includes(query)
+          : produit.margeDegagnante.toString().includes(query)) ||
         produit.tvaApplicable.toString().includes(query) ||
         produit.stockActuel.toString().includes(query) ||
         produit.recherche?.some((term) => term.toLowerCase().includes(query)) ||
@@ -463,8 +597,8 @@ const ProduitComponent = () => {
       : true;
     const matchesMinStock = minStock ? produit.stockActuel >= Number(minStock) : true;
     const matchesMaxStock = maxStock ? produit.stockActuel <= Number(maxStock) : true;
-    const matchesMinPrix = minPrix ? produit.prixUnitaireHT >= Number(minPrix) : true;
-    const matchesMaxPrix = maxPrix ? produit.prixUnitaireHT <= Number(maxPrix) : true;
+    const matchesMinPrix = minPrix ? unitTTC >= Number(minPrix) : true;
+    const matchesMaxPrix = maxPrix ? unitTTC <= Number(maxPrix) : true;
 
     return (
       matchesSearch &&
@@ -482,8 +616,17 @@ const ProduitComponent = () => {
     nomProduit: produit.nomProduit || "N/A",
     categorie: produit.categorie || "N/A",
     prixAchat: `${(produit.prixAchat || 0).toFixed(2)} DT`,
-    prixUnitaireHT: `${(produit.prixUnitaireHT || 0).toFixed(2)} DT`,
-    margeDegagnante: `${(produit.margeDegagnante || 0).toFixed(2)} %`,
+    prixUnitaireTTC: `${(produit.prixUnitaireTTC !== undefined && produit.prixUnitaireTTC !== null
+      ? Number(produit.prixUnitaireTTC)
+      : Number(produit.prixUnitaireHT || 0) * (1 + Number(produit.tvaApplicable || 0) / 100)
+    ).toFixed(2)} DT`,
+    margeDegagnante: `${(produit.margeEnDT !== undefined && produit.margeEnDT !== null
+      ? Number(produit.margeEnDT)
+      : produit.prixUnitaireTTC
+      ? Number(produit.prixUnitaireTTC) - Number(produit.prixAchat || 0)
+      : Number(produit.prixUnitaireHT || 0) * (1 + Number(produit.tvaApplicable || 0) / 100) -
+        Number(produit.prixAchat || 0)
+    ).toFixed(2)} DT`,
     tvaApplicable: `${(produit.tvaApplicable || 0).toFixed(2)} %`,
     stockActuel: produit.stockActuel || 0,
     fournisseurPrincipal: produit.fournisseurPrincipal?.nomRaisonSociale || "N/A",
@@ -750,8 +893,15 @@ const ProduitComponent = () => {
                   required: true,
                 },
                 {
-                  label: "Marge de Gagnante (%)",
-                  name: "margeDegagnante",
+                  label: "Prix Unitaire TTC (DT)",
+                  name: "prixUnitaireTTC",
+                  type: "number",
+                  min: 0.01,
+                  step: "0.01",
+                },
+                {
+                  label: "Marge (DT)",
+                  name: "margeEnDT",
                   type: "number",
                   min: 0,
                   step: "0.01",
@@ -907,9 +1057,25 @@ const ProduitComponent = () => {
                   : "N/A",
               },
               {
-                label: "Marge de Gagnante (%)",
-                value: currentProduit.margeDegagnante
-                  ? Number(currentProduit.margeDegagnante).toFixed(2)
+                label: "Prix Unitaire TTC (DT)",
+                value: currentProduit.prixUnitaireTTC
+                  ? Number(currentProduit.prixUnitaireTTC).toFixed(2)
+                  : "N/A",
+              },
+              {
+                label: "Marge (DT)",
+                value: currentProduit.margeEnDT
+                  ? Number(currentProduit.margeEnDT).toFixed(2)
+                  : currentProduit.prixUnitaireTTC
+                  ? (
+                      Number(currentProduit.prixUnitaireTTC) - Number(currentProduit.prixAchat || 0)
+                    ).toFixed(2)
+                  : currentProduit.prixUnitaireHT
+                  ? (
+                      Number(currentProduit.prixUnitaireHT) *
+                        (1 + Number(currentProduit.tvaApplicable || 0) / 100) -
+                      Number(currentProduit.prixAchat || 0)
+                    ).toFixed(2)
                   : "N/A",
               },
               {

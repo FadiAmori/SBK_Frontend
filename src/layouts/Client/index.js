@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "layouts/config";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -35,6 +36,8 @@ const tableColumns = [
   { Header: "Adresse", accessor: "adresse", align: "center" },
   { Header: "Téléphone", accessor: "telephone", align: "center" },
   { Header: "Email", accessor: "email", align: "center" },
+  { Header: "Matricule Fiscale", accessor: "matriculeFiscale", align: "center" },
+  { Header: "Crédit (DT)", accessor: "credit", align: "center" },
   { Header: "Type Client", accessor: "typeClient", align: "center" },
   { Header: "Actions", accessor: "actions", align: "center" },
 ];
@@ -58,11 +61,12 @@ const ClientComponent = () => {
     conditionsPaiement: "",
     historiqueAchats: 0,
     remisesConditionsSpeciales: "",
+    matriculeFiscale: "",
     recherche: "",
   });
   // Filter states
-  const [searchQuery, setSearchQuery] = useState("");
   const [filterTypeClient, setFilterTypeClient] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchClients();
@@ -71,7 +75,7 @@ const ClientComponent = () => {
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("https://sbk-1.onrender.com/api/clients");
+      const res = await axios.get(`${API_BASE_URL}/api/clients`);
       const data = Array.isArray(res.data) ? res.data : [res.data];
       setClients(data);
     } catch (err) {
@@ -115,6 +119,7 @@ const ClientComponent = () => {
         ? new Date(client.dateInscription).toISOString().split("T")[0]
         : "",
       historiqueAchats: Math.max(0, client.historiqueAchats || 0),
+      matriculeFiscale: client.matriculeFiscale || "",
     });
     setError("");
     setShowModal(true);
@@ -122,7 +127,7 @@ const ClientComponent = () => {
 
   const handleView = async (client) => {
     try {
-      const res = await axios.get(`https://sbk-1.onrender.com/api/clients/${client._id}`);
+      const res = await axios.get(`${API_BASE_URL}/api/clients/${client._id}`);
       setCurrentClient({
         ...res.data,
         recherche: res.data.recherche?.join(", ") || "",
@@ -130,6 +135,7 @@ const ClientComponent = () => {
           ? new Date(res.data.dateInscription).toISOString().split("T")[0]
           : "",
         historiqueAchats: Math.max(0, res.data.historiqueAchats || 0),
+        matriculeFiscale: res.data.matriculeFiscale || "",
       });
       setShowViewModal(true);
     } catch (err) {
@@ -140,7 +146,7 @@ const ClientComponent = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
       try {
-        await axios.delete(`https://sbk-1.onrender.com/api/clients/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/clients/${id}`);
         setClients((prev) => prev.filter((client) => client._id !== id));
       } catch (err) {
         setError(err.response?.data?.error || "Échec de la suppression du client.");
@@ -181,9 +187,9 @@ const ClientComponent = () => {
     try {
       let response;
       if (isEditing) {
-        response = await axios.put(`https://sbk-1.onrender.com/api/clients/${_id}`, payload);
+        response = await axios.put(`${API_BASE_URL}/api/clients/${_id}`, payload);
       } else {
-        response = await axios.post("https://sbk-1.onrender.com/api/clients", payload);
+        response = await axios.post(`${API_BASE_URL}/api/clients`, payload);
         setClients((prev) => [...prev, response.data]);
       }
       fetchClients();
@@ -216,6 +222,8 @@ const ClientComponent = () => {
     adresse: client.adresse || "N/A",
     telephone: client.telephone || "N/A",
     email: client.email || "N/A",
+    matriculeFiscale: client.matriculeFiscale || "N/A",
+    credit: client.credit != null ? Number(client.credit).toFixed(2) : "0.00",
     typeClient: client.typeClient || "N/A",
     actions: (
       <MDBox display="flex" justifyContent="center" alignItems="center" gap={1}>
@@ -379,6 +387,7 @@ const ClientComponent = () => {
                 { label: "Adresse", name: "adresse", type: "text", required: true },
                 { label: "Téléphone", name: "telephone", type: "text" },
                 { label: "Email", name: "email", type: "email" },
+                { label: "Matricule Fiscale", name: "matriculeFiscale", type: "text" },
                 { label: "Conditions de Paiement", name: "conditionsPaiement", type: "text" },
                 {
                   label: "Historique des Achats",
@@ -467,6 +476,12 @@ const ClientComponent = () => {
             {[
               { label: "N° Client", value: currentClient.numeroClient },
               { label: "Nom/Raison Sociale", value: currentClient.nomRaisonSociale },
+              { label: "Matricule Fiscale", value: currentClient.matriculeFiscale },
+              {
+                label: "Crédit (DT)",
+                value:
+                  currentClient.credit != null ? Number(currentClient.credit).toFixed(2) : "0.00",
+              },
               { label: "Adresse", value: currentClient.adresse },
               { label: "Téléphone", value: currentClient.telephone },
               { label: "Email", value: currentClient.email },
