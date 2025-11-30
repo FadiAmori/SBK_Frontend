@@ -355,7 +355,7 @@ const BonDeSortieComponent = () => {
           );
         }
         doc.setFontSize(16);
-        doc.text("Bon de Sortie", pageWidth / 2, logoY + logoHeight + 10, { align: "center" });
+        doc.text("Bon de sortie", pageWidth / 2, logoY + logoHeight + 10, { align: "center" });
         doc.setFontSize(12);
         // Left column
         doc.text(`Destination: ${bon.destination || "N/A"}`, margin, logoY + logoHeight + 20);
@@ -612,7 +612,7 @@ const BonDeSortieComponent = () => {
             <Grid item xs={12}>
               <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <MDTypography variant="h4" fontWeight="medium">
-                  Gestion des Bons de Sortie
+                  Gestion des bons de sortie
                 </MDTypography>
                 <MDBox>
                   <MDButton
@@ -621,7 +621,7 @@ const BonDeSortieComponent = () => {
                     onClick={handleCreateBon}
                     aria-label="Créer un bon de sortie"
                   >
-                    <Icon>add</Icon> Nouveau Bon de Sortie
+                    <Icon>add</Icon> Nouveau bon de sortie
                   </MDButton>
                 </MDBox>
               </MDBox>
@@ -696,7 +696,7 @@ const BonDeSortieComponent = () => {
         <MDBox sx={modalStyle}>
           <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <MDTypography variant="h5" id="bonModalLabel">
-              {isEditing ? "Modifier le Bon de Sortie" : "Créer un Bon de Sortie"}
+              {isEditing ? "Modifier le bon de sortie" : "Créer un bon de sortie"}
             </MDTypography>
             <IconButton onClick={() => setShowBonModal(false)} aria-label="Fermer">
               <Icon>close</Icon>
@@ -760,8 +760,13 @@ const BonDeSortieComponent = () => {
                 <DataTable
                   table={{ columns: itemTableColumns, rows: itemTableRows }}
                   isSorted={false}
-                  entriesPerPage={false}
-                  showTotalEntries={true}
+                  // disable pagination by setting entries per page to number of items
+                  entriesPerPage={{
+                    defaultValue: bonItems.length || 10,
+                    entries: [bonItems.length || 10],
+                  }}
+                  // hide the "Showing X to Y of Z entries" line in modal
+                  showTotalEntries={false}
                   noEndBorder
                 />
               ) : (
@@ -900,7 +905,7 @@ const BonDeSortieComponent = () => {
         <MDBox sx={modalStyle}>
           <MDBox display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <MDTypography variant="h5" id="viewModalLabel">
-              Détails du Bon de Sortie
+              Détails du bon de sortie
             </MDTypography>
             <IconButton onClick={() => setShowViewModal(false)} aria-label="Fermer">
               <Icon>close</Icon>
@@ -946,8 +951,13 @@ const BonDeSortieComponent = () => {
               <DataTable
                 table={{ columns: itemTableColumns, rows: itemTableRows }}
                 isSorted={false}
-                entriesPerPage={false}
-                showTotalEntries={true}
+                // disable pagination by setting entries per page to number of items
+                entriesPerPage={{
+                  defaultValue: bonItems.length || 10,
+                  entries: [bonItems.length || 10],
+                }}
+                // hide the "Showing X to Y of Z entries" line in modal
+                showTotalEntries={false}
                 noEndBorder
               />
             </MDBox>
