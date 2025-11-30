@@ -393,7 +393,7 @@ const FactureAchatComponent = () => {
         }
 
         doc.setFontSize(16);
-        doc.text("Facture d'Achat", pageWidth / 2, logoY + logoHeight + 10, { align: "center" });
+        doc.text("Facture d'achat", pageWidth / 2, logoY + logoHeight + 10, { align: "center" });
         doc.setFontSize(12);
 
         const fournisseurData =
